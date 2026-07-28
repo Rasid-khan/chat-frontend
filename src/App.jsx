@@ -344,6 +344,8 @@ function App() {
   };
 
   const setupPeerConnection = (targetId) => {
+    console.log("setupPeerConnection called");
+
     cleanupPeer();
     pendingIceCandidatesRef.current = [];
 
