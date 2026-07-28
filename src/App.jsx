@@ -115,22 +115,20 @@ function App() {
     const video = remoteVideoRef.current;
     if (!video || !stream) return;
 
-    // Agar wahi stream pehle se lagi hai to dobara mat lagao
+    // अगर वही stream पहले से लगी है तो दोबारा मत लगाओ
     if (video.srcObject === stream) return;
 
+    video.playsInline = true;
+    video.autoplay = true;
     video.srcObject = stream;
 
     try {
-      remoteVideo.playsInline = true;
-      remoteVideo.autoplay = true;
-      remoteVideo.srcObject = stream;
       await video.play();
       console.log("Remote tracks:", stream.getTracks());
     } catch (e) {
       console.error(e);
     }
   };
-
   const getMediaErrorMessage = (error, mode) => {
     if (IS_INSECURE_MOBILE_CONTEXT) {
       return "Video/audio calls need HTTPS on mobile. Open the app with an HTTPS URL.";
