@@ -90,6 +90,36 @@ function App() {
     }
   };
 
+  const attachRemoteStream = async (stream) => {
+    if (!remoteVideoRef.current || !stream) {
+      return;
+    }
+
+    const remoteVideo = remoteVideoRef.current;
+    remoteVideo.srcObject = stream;
+
+    try {
+      await remoteVideo.play();
+    } catch (error) {
+      // Some browsers block autoplay with audio; mute first so video can start rendering.
+      if (error?.name === "NotAllowedError") {
+        remoteVideo.muted = true;
+        try {
+          await remoteVideo.play();
+          setCallStatus((prev) =>
+            prev.includes("tap to unmute")
+              ? prev
+              : `${prev} (tap remote video to unmute)`,
+          );
+        } catch (retryError) {
+          console.error("Failed to play remote video", retryError);
+        }
+      } else {
+        console.error("Failed to play remote video", error);
+      }
+    }
+  };
+
   const getMediaErrorMessage = (error, mode) => {
     if (IS_INSECURE_MOBILE_CONTEXT) {
       return "Video/audio calls need HTTPS on mobile. Open the app with an HTTPS URL.";
@@ -324,7 +354,22 @@ function App() {
     };
 
     pc.ontrack = (event) => {
-      const stream = event.streams[0];
+      let stream = event.streams?.[0];
+
+      if (!stream) {
+        stream = remoteVideoRef.current?.srcObject;
+      }
+
+      if (!(stream instanceof MediaStream)) {
+        stream = new MediaStream();
+      }
+
+      if (
+        event.track &&
+        !stream.getTracks().some((t) => t.id === event.track.id)
+      ) {
+        stream.addTrack(event.track);
+      }
 
       console.log("Remote stream:", stream);
 
@@ -338,21 +383,11 @@ function App() {
         console.log("muted:", videoTrack.muted);
       }
 
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
+      attachRemoteStream(stream);
 
-        remoteVideoRef.current.onloadedmetadata = async () => {
-          console.log(
-            "Video Size:",
-            remoteVideoRef.current.videoWidth,
-            remoteVideoRef.current.videoHeight,
-          );
-
-          try {
-            await remoteVideoRef.current.play();
-          } catch (err) {
-            console.error(err);
-          }
+      if (event.track) {
+        event.track.onunmute = () => {
+          attachRemoteStream(stream);
         };
       }
     };
@@ -615,6 +650,12 @@ function App() {
               ref={remoteVideoRef}
               autoPlay
               playsInline
+              onClick={() => {
+                if (remoteVideoRef.current?.muted) {
+                  remoteVideoRef.current.muted = false;
+                  remoteVideoRef.current.play().catch(() => {});
+                }
+              }}
               className={callType === "audio" ? "audio-only" : ""}
             />
           </div>
