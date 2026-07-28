@@ -111,32 +111,18 @@ function App() {
   };
 
   const attachRemoteStream = async (stream) => {
-    if (!remoteVideoRef.current || !stream) {
-      return;
-    }
+    const video = remoteVideoRef.current;
+    if (!video || !stream) return;
 
-    const remoteVideo = remoteVideoRef.current;
-    remoteVideo.srcObject = stream;
+    // Agar wahi stream pehle se lagi hai to dobara mat lagao
+    if (video.srcObject === stream) return;
+
+    video.srcObject = stream;
 
     try {
-      await remoteVideo.play();
-    } catch (error) {
-      // Some browsers block autoplay with audio; mute first so video can start rendering.
-      if (error?.name === "NotAllowedError") {
-        remoteVideo.muted = true;
-        try {
-          await remoteVideo.play();
-          setCallStatus((prev) =>
-            prev.includes("tap to unmute")
-              ? prev
-              : `${prev} (tap remote video to unmute)`,
-          );
-        } catch (retryError) {
-          console.error("Failed to play remote video", retryError);
-        }
-      } else {
-        console.error("Failed to play remote video", error);
-      }
+      await video.play();
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -374,41 +360,12 @@ function App() {
     };
 
     pc.ontrack = (event) => {
-      let stream = event.streams?.[0];
+      console.log("Track:", event.track.kind);
 
-      if (!stream) {
-        stream = remoteVideoRef.current?.srcObject;
-      }
+      const stream = event.streams[0];
 
-      if (!(stream instanceof MediaStream)) {
-        stream = new MediaStream();
-      }
-
-      if (
-        event.track &&
-        !stream.getTracks().some((t) => t.id === event.track.id)
-      ) {
-        stream.addTrack(event.track);
-      }
-
-      console.log("Remote stream:", stream);
-
-      const videoTrack = stream.getVideoTracks()[0];
-
-      console.log("Video Track:", videoTrack);
-
-      if (videoTrack) {
-        console.log("enabled:", videoTrack.enabled);
-        console.log("readyState:", videoTrack.readyState);
-        console.log("muted:", videoTrack.muted);
-      }
-
-      attachRemoteStream(stream);
-
-      if (event.track) {
-        event.track.onunmute = () => {
-          attachRemoteStream(stream);
-        };
+      if (event.track.kind === "video") {
+        attachRemoteStream(stream);
       }
     };
 
