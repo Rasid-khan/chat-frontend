@@ -74,6 +74,8 @@ function App() {
   const localStreamRef = useRef(null);
   const incomingOfferRef = useRef(null);
   const pendingIceCandidatesRef = useRef([]);
+  const activePeerIdRef = useRef("");
+  const callTypeRef = useRef("video");
 
   const addOrQueueIceCandidate = async (candidate) => {
     const pc = peerConnectionRef.current;
@@ -115,9 +117,6 @@ function App() {
     const video = remoteVideoRef.current;
     if (!video || !stream) return;
 
-    // अगर वही stream पहले से लगी है तो दोबारा मत लगाओ
-    if (video.srcObject === stream) return;
-
     video.playsInline = true;
     video.autoplay = true;
     video.srcObject = stream;
@@ -126,8 +125,27 @@ function App() {
       await video.play();
       console.log("Remote tracks:", stream.getTracks());
     } catch (e) {
-      console.error(e);
+      if (e?.name === "NotAllowedError") {
+        video.muted = true;
+        try {
+          await video.play();
+          setCallStatus((prev) =>
+            prev.includes("tap remote video")
+              ? prev
+              : `${prev} (tap remote video to unmute)`,
+          );
+        } catch (retryError) {
+          console.error("Remote play retry failed", retryError);
+        }
+      } else {
+        console.error(e);
+      }
     }
+  };
+
+  const setCallMode = (mode) => {
+    callTypeRef.current = mode;
+    setCallType(mode);
   };
   const getMediaErrorMessage = (error, mode) => {
     if (IS_INSECURE_MOBILE_CONTEXT) {
@@ -254,7 +272,8 @@ function App() {
 
     socket.on("call_offer", async ({ fromId, fromName, offer, mode }) => {
       incomingOfferRef.current = { fromId, offer, mode };
-      setCallType(mode);
+      setCallMode(mode);
+      activePeerIdRef.current = fromId;
       setSelectedUserId(fromId);
       setCallStatus(`Incoming ${mode} call from ${fromName}`);
 
@@ -277,7 +296,7 @@ function App() {
       }
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
       await flushPendingIceCandidates();
-      setCallStatus(`In ${callType} call`);
+      setCallStatus(`In ${callTypeRef.current} call`);
     });
 
     socket.on("ice_candidate", async ({ candidate }) => {
@@ -286,13 +305,16 @@ function App() {
 
     socket.on("call_rejected", () => {
       setCallStatus("Call rejected");
-      endCall();
+      cleanupMedia();
+      cleanupPeer();
+      activePeerIdRef.current = "";
     });
 
     socket.on("call_ended", () => {
       setCallStatus("Call ended");
       cleanupMedia();
       cleanupPeer();
+      activePeerIdRef.current = "";
     });
 
     return () => {
@@ -305,7 +327,7 @@ function App() {
       socket.off("call_rejected");
       socket.off("call_ended");
     };
-  }, [callType]);
+  }, []);
 
   const joinRoom = () => {
     const trimmedUsername = username.trim();
@@ -401,7 +423,8 @@ function App() {
     }
 
     try {
-      setCallType(mode);
+      setCallMode(mode);
+      activePeerIdRef.current = selectedUserId;
       setCallStatus(`Calling (${mode})...`);
 
       const localStream = await requestLocalMedia(mode);
@@ -434,7 +457,8 @@ function App() {
 
   const acceptCall = async (fromId, offer, mode) => {
     try {
-      setCallType(mode);
+      setCallMode(mode);
+      activePeerIdRef.current = fromId;
       const localStream = await requestLocalMedia(mode);
       localStreamRef.current = localStream;
 
@@ -479,6 +503,7 @@ function App() {
 
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
+      remoteVideoRef.current.muted = false;
     }
   };
 
@@ -494,11 +519,13 @@ function App() {
   };
 
   const endCall = () => {
-    if (selectedUserId) {
-      socket.emit("call_end", { targetId: selectedUserId });
+    const targetId = activePeerIdRef.current || selectedUserId;
+    if (targetId) {
+      socket.emit("call_end", { targetId });
     }
     cleanupMedia();
     cleanupPeer();
+    activePeerIdRef.current = "";
     setCallStatus("idle");
   };
 
@@ -519,7 +546,8 @@ function App() {
     setTypingUser("");
     setMessage("");
     setCallStatus("idle");
-    setCallType("video");
+    setCallMode("video");
+    activePeerIdRef.current = "";
     setUsername("");
     setRoomId("general");
   };
