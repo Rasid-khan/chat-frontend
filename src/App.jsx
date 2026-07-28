@@ -121,7 +121,11 @@ function App() {
     video.srcObject = stream;
 
     try {
+      remoteVideo.playsInline = true;
+      remoteVideo.autoplay = true;
+      remoteVideo.srcObject = stream;
       await video.play();
+      console.log("Remote tracks:", stream.getTracks());
     } catch (e) {
       console.error(e);
     }
@@ -365,11 +369,22 @@ function App() {
     pc.ontrack = (event) => {
       console.log("Track:", event.track.kind);
 
-      const stream = event.streams[0];
+      let stream = remoteVideoRef.current?.srcObject;
 
-      if (event.track.kind === "video") {
-        attachRemoteStream(stream);
+      if (!(stream instanceof MediaStream)) {
+        stream = new MediaStream();
       }
+
+      if (!stream.getTracks().find((t) => t.id === event.track.id)) {
+        stream.addTrack(event.track);
+      }
+
+      attachRemoteStream(stream);
+
+      event.track.onunmute = () => {
+        console.log("Track unmuted:", event.track.kind);
+        attachRemoteStream(stream);
+      };
     };
     pc.oniceconnectionstatechange = () => {
       console.log("ICE STATE:", pc.iceConnectionState);
