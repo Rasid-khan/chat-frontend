@@ -39,6 +39,7 @@ const ICE_SERVERS = (() => {
     return DEFAULT_ICE_SERVERS;
   }
 })();
+console.log("ICE SERVERS:", ICE_SERVERS);
 const SESSION_KEY = "chatapp_session";
 const IS_LOCALHOST_HOST = ["localhost", "127.0.0.1"].includes(
   window.location.hostname,
