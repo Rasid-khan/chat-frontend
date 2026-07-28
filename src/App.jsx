@@ -3,8 +3,27 @@ import { io } from "socket.io-client";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 const SOCKET_PATH = import.meta.env.VITE_SOCKET_PATH || "/socket.io";
-const DEFAULT_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
-
+//const DEFAULT_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+const DEFAULT_ICE_SERVERS = [
+  {
+    urls: "stun:stun.l.google.com:19302",
+  },
+  {
+    urls: "turn:openrelay.metered.ca:80",
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
+  {
+    urls: "turn:openrelay.metered.ca:443",
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
+  {
+    urls: "turn:openrelay.metered.ca:443?transport=tcp",
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
+];
 const ICE_SERVERS = (() => {
   try {
     const raw = import.meta.env.VITE_ICE_SERVERS;
