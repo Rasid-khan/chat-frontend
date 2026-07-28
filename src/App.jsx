@@ -320,7 +320,17 @@ function App() {
         };
       }
     };
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE:", pc.iceConnectionState);
+    };
 
+    pc.onconnectionstatechange = () => {
+      console.log("Connection:", pc.connectionState);
+    };
+
+    pc.onicegatheringstatechange = () => {
+      console.log("Gathering:", pc.iceGatheringState);
+    };
     pc.oniceconnectionstatechange = () => {
       console.log("ICE State:", pc.iceConnectionState);
     };
