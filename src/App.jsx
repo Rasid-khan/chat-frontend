@@ -84,14 +84,7 @@ function App() {
 
     const primaryConstraints = {
       audio: true,
-      video:
-        mode === "video"
-          ? {
-              facingMode: "user",
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            }
-          : false,
+      video: mode === "video",
     };
 
     try {
@@ -283,10 +276,36 @@ function App() {
     };
 
     pc.ontrack = (event) => {
-      console.log("✅ Remote stream received:", event.streams);
+      const stream = event.streams[0];
+
+      console.log("Remote stream:", stream);
+
+      const videoTrack = stream.getVideoTracks()[0];
+
+      console.log("Video Track:", videoTrack);
+
+      if (videoTrack) {
+        console.log("enabled:", videoTrack.enabled);
+        console.log("readyState:", videoTrack.readyState);
+        console.log("muted:", videoTrack.muted);
+      }
 
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+        remoteVideoRef.current.srcObject = stream;
+
+        remoteVideoRef.current.onloadedmetadata = async () => {
+          console.log(
+            "Video Size:",
+            remoteVideoRef.current.videoWidth,
+            remoteVideoRef.current.videoHeight,
+          );
+
+          try {
+            await remoteVideoRef.current.play();
+          } catch (err) {
+            console.error(err);
+          }
+        };
       }
     };
 
