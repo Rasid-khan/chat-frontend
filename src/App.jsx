@@ -371,15 +371,13 @@ function App() {
         attachRemoteStream(stream);
       }
     };
-
     pc.oniceconnectionstatechange = () => {
-      console.log("ICE State:", pc.iceConnectionState);
+      console.log("ICE STATE:", pc.iceConnectionState);
     };
 
     pc.onconnectionstatechange = () => {
-      console.log("Connection State:", pc.connectionState);
+      console.log("PC STATE:", pc.connectionState);
     };
-
     peerConnectionRef.current = pc;
     return pc;
   };
