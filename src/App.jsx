@@ -84,12 +84,24 @@ function App() {
 
     const primaryConstraints = {
       audio: true,
-      video: mode === "video",
+      video:
+        mode === "video"
+          ? {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            }
+          : false,
     };
 
     try {
-      return await navigator.mediaDevices.getUserMedia(primaryConstraints);
+      console.log("Requesting media...");
+      const stream =
+        await navigator.mediaDevices.getUserMedia(primaryConstraints);
+      console.log("Media granted:", stream);
+      return stream;
     } catch (error) {
+      console.error("getUserMedia Error:", error);
       if (mode !== "video") {
         throw error;
       }
