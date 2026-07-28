@@ -52,6 +52,43 @@ function App() {
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
   const incomingOfferRef = useRef(null);
+  const pendingIceCandidatesRef = useRef([]);
+
+  const addOrQueueIceCandidate = async (candidate) => {
+    const pc = peerConnectionRef.current;
+    if (!pc || !candidate) {
+      return;
+    }
+
+    if (pc.remoteDescription && pc.remoteDescription.type) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (error) {
+        console.error("Failed to add ICE candidate", error);
+      }
+      return;
+    }
+
+    pendingIceCandidatesRef.current.push(candidate);
+  };
+
+  const flushPendingIceCandidates = async () => {
+    const pc = peerConnectionRef.current;
+    if (!pc || !pc.remoteDescription || !pc.remoteDescription.type) {
+      return;
+    }
+
+    const pending = [...pendingIceCandidatesRef.current];
+    pendingIceCandidatesRef.current = [];
+
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (error) {
+        console.error("Failed to add queued ICE candidate", error);
+      }
+    }
+  };
 
   const getMediaErrorMessage = (error, mode) => {
     if (IS_INSECURE_MOBILE_CONTEXT) {
@@ -179,6 +216,7 @@ function App() {
     socket.on("call_offer", async ({ fromId, fromName, offer, mode }) => {
       incomingOfferRef.current = { fromId, offer, mode };
       setCallType(mode);
+      setSelectedUserId(fromId);
       setCallStatus(`Incoming ${mode} call from ${fromName}`);
 
       const accept = window.confirm(
@@ -199,15 +237,12 @@ function App() {
         return;
       }
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      await flushPendingIceCandidates();
       setCallStatus(`In ${callType} call`);
     });
 
     socket.on("ice_candidate", async ({ candidate }) => {
-      const pc = peerConnectionRef.current;
-      if (!pc || !candidate) {
-        return;
-      }
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      await addOrQueueIceCandidate(candidate);
     });
 
     socket.on("call_rejected", () => {
@@ -273,6 +308,7 @@ function App() {
 
   const setupPeerConnection = (targetId) => {
     cleanupPeer();
+    pendingIceCandidatesRef.current = [];
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
@@ -386,6 +422,7 @@ function App() {
         .forEach((track) => pc.addTrack(track, localStream));
 
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      await flushPendingIceCandidates();
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -426,6 +463,8 @@ function App() {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
+
+    pendingIceCandidatesRef.current = [];
   };
 
   const endCall = () => {
