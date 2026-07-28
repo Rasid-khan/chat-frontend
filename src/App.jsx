@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
-const SOCKET_URL = "https://chat-backend-pis0.onrender.com";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 const SOCKET_PATH = import.meta.env.VITE_SOCKET_PATH || "/socket.io";
 const DEFAULT_ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 const ICE_SERVERS = (() => {
@@ -272,6 +272,8 @@ function App() {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     pc.onicecandidate = (event) => {
+      console.log("ICE Candidate:", event.candidate);
+
       if (event.candidate) {
         socket.emit("ice_candidate", {
           targetId,
@@ -281,15 +283,24 @@ function App() {
     };
 
     pc.ontrack = (event) => {
+      console.log("✅ Remote stream received:", event.streams);
+
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE State:", pc.iceConnectionState);
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log("Connection State:", pc.connectionState);
+    };
+
     peerConnectionRef.current = pc;
     return pc;
   };
-
   const startCall = async (mode) => {
     if (!selectedUserId || selectedUserId === socket.id) {
       alert("Select a user to call.");
